@@ -1,0 +1,22 @@
+WITH previous_day AS (
+    SELECT trans_dt,region, site_name, STRING_AGG(DISTINCT metric_name), COUNT(DISTINCT metric_name) as mc
+  FROM vz-it-pr-gudv-dtwndo-0.aid_nwperf_aether_core_tbls_v.aether_core_utilization_planning
+  WHERE CAST(trans_dt AS DATE)= "2024-10-01"
+   AND region IS NOT NULL
+  GROUP BY all
+),
+current_day AS (
+    SELECT trans_dt, region, site_name, STRING_AGG(DISTINCT metric_name), COUNT(DISTINCT metric_name) as mc
+  FROM vz-it-pr-gudv-dtwndo-0.aid_nwperf_aether_core_tbls_v.aether_core_utilization_planning
+  WHERE CAST(trans_dt AS DATE) = "2025-04-11"
+   AND region IS NOT NULL
+  GROUP BY all
+)
+SELECT cd.site_name, cd.trans_dt,pd.trans_dt,cd.mc as cmc,pd.mc as pmc,(pd.mc-cd.mc)as diff
+FROM current_day cd
+JOIN previous_day pd 
+ON 
+--cd.metric_name = pd.metric_name 
+--AND 
+cd.site_name = pd.site_name
+where (cd.mc-pd.mc)>0
