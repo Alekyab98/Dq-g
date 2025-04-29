@@ -1,0 +1,60 @@
+-- Step 1: Base dates and site names from UPF data
+WITH base_dates AS (
+  SELECT DISTINCT trans_dt, site_name
+  FROM `vz-it-pr-gudv-dtwndo-0.aid_nwperf_aether_core_tbls_v.aether_upf_performance_derived_tbl`
+  WHERE CAST(trans_dt AS DATE) >= "2025-04-10"
+),
+
+-- Step 2: SMF metric count
+smf_data AS (
+  SELECT
+    trans_dt,
+    site_name,
+    COUNT(DISTINCT metric_name) AS smf_metric_count
+  FROM `vz-it-pr-gudv-dtwndo-0.aid_nwperf_aether_core_tbls_v.aether_smf_performance_derived_tbl`
+  WHERE CAST(trans_dt AS DATE) >= "2025-04-10"
+    AND metric_name IN ('active_sessions', 'total_subscribers')
+    AND region IS NOT NULL
+  GROUP BY trans_dt, site_name
+),
+
+-- Step 3: UPF metric count
+upf_data AS (
+  SELECT
+    trans_dt,
+    site_name,
+    COUNT(DISTINCT metric_name) AS upf_metric_count
+  FROM `vz-it-pr-gudv-dtwndo-0.aid_nwperf_aether_core_tbls_v.aether_upf_performance_derived_tbl`
+  WHERE CAST(trans_dt AS DATE) >= "2025-04-10"
+    AND LOWER(metric_name) IN (
+      'aggregate_in_out_throughput',
+      'aggregate_out_throughput',
+      'aggregate_in_throughput',
+      'aggregate_ul_throughput',
+      'aggregate_ul_dl_throughput',
+      'aggregate_dl_throughput'
+    )
+    AND region IS NOT NULL
+  GROUP BY trans_dt, site_name
+),
+
+-- Step 4: Combine all
+agg_data AS (
+  SELECT
+    b.trans_dt,
+    b.site_name,
+    COALESCE(s.smf_metric_count, 0) AS smf_metric_count,
+    COALESCE(u.upf_metric_count, 0) AS upf_metric_count,
+    COALESCE(s.smf_metric_count, 0) + COALESCE(u.upf_metric_count, 0) AS total_count
+  FROM base_dates b
+  LEFT JOIN smf_data s
+    ON b.trans_dt = s.trans_dt AND b.site_name = s.site_name
+  LEFT JOIN upf_data u
+    ON b.trans_dt = u.trans_dt AND b.site_name = u.site_name
+)
+
+-- Final result
+SELECT *
+FROM agg_data
+WHERE site_name = 'Milliani'
+ORDER BY trans_dt
